@@ -915,7 +915,7 @@ class Window_InvaderScore < Window_Base
     draw_bonus_shields(bonus_shields)
   end
    
-  def draw_shields(shields, x, y, width = Graphics.width / 4)
+  def draw_shields(shields, x, y, width = Graphics.width / 4)se
     draw_gauge(x, y, width, shields / Galv_SI::PLAYER_SHIELDS.to_f, text_color(1),
     text_color(4))
   end

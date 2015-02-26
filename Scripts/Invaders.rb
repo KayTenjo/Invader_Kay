@@ -1,7 +1,46 @@
+
+
+
+module Inv_Settings
+
+#-------------------------------------------------------------------------------
+#  Opciones del script
+#-------------------------------------------------------------------------------  
+
+
+  #---------------------#
+  # OPCIONES DE JUGADOR #
+  #---------------------#
+
+    VIDAS_INICIALES = 3
+    VELOCIDAD_JUGADOR = 5
+    VELOCIDAD_DISPARO_JUGADOR= 8
+
+  #----------------------#
+  # OPCIONES DE ENEMIGOS #
+  #----------------------#
+
+    ENEMIGO_HP = 1
+    VELOCIDAD_DISPARO_ENEMIGO= 4
+    VELOCIDAD_ENEMIGO= 2
+
+
+  #----------------------#
+  # OTRAS OPCIONES       #
+  #----------------------#
+
+    PUNTOS_VIDA_EXTRA=100
+    ANCHO_PUNTAJE= 50
+    LARGO_PUNTAJE= 100
+
+
+end
+
+# end Inv_Settings
+
 #-------------------------------------------------------------------------------
 #  CACHE
 #-------------------------------------------------------------------------------
- 
 module Cache
   def self.cargar(filename)
     load_bitmap("Graphics/Invaders/", filename)
@@ -24,7 +63,7 @@ class K_Invaders_Scene <Scene_Base
     init_variables
     create_backgroud
     create_sprites
-    #create_stats
+    create_stats
   end
 
   def play_bgm
@@ -38,9 +77,18 @@ class K_Invaders_Scene <Scene_Base
   
   def init_variables
 
+    ###### Globables###
+
+    $puntaje= 0
+    $vidas=Inv_Settings::VIDAS_INICIALES 
+
+    ######
+
+
     @array_disparos_jugador =Array.new
     @array_enemigos=Array.new
     @cont_disparos=0
+    @cont_respawn=0
     @puedo_disparar= true
     @estoy_vivo = true
     @array_disparos_enemigos = Array.new
@@ -59,6 +107,13 @@ class K_Invaders_Scene <Scene_Base
 
     @background = Plane.new
     @background.bitmap = Cache.cargar("backdrop")
+
+  end
+
+  def create_stats
+
+    @window_score = Window_Score.new
+    @window_score
 
   end
     
@@ -83,26 +138,49 @@ class K_Invaders_Scene <Scene_Base
 
     self.return if Input.press?(:B)
 
-    if Input.press?(:A)
+    if @game_over
 
-      if @puedo_disparar && @estoy_vivo
-      	@player_shoot_se.play
-        @array_disparos_jugador.push(Sprite_Shooting.new(@viewport3,@player_sprite.x + @player_sprite.ancho/2, @player_sprite.y,true))
-        @cont_disparos =0 
-        @puedo_disparar = false
-      else
-        @cont_disparos+= 5
-        if @cont_disparos == 30
-          @puedo_disparar= true
+      initialize_game if Input.press?(:A)
+
+    else
+
+      if @estoy_vivo
+
+        if Input.press?(:A) && @puedo_disparar
+
+          @player_shoot_se.play
+          @array_disparos_jugador.push(Sprite_Shooting.new(@viewport3,@player_sprite.x + @player_sprite.ancho/2, @player_sprite.y,true))
+          @cont_disparos =0 
+          @puedo_disparar = false
+
         end
+
+        @player_sprite.update
+        update_collisions
+
+      else
+
+        @cont_respawn+=1
+
+        if @cont_respawn==120
+          @player_sprite = Sprite_Player.new(@viewport1)
+          @estoy_vivo=true
+          @cont_respawn=0
+
+        end
+
+      
       end
+
+      @cont_disparos+= 5
+
+      if @cont_disparos == 30
+        @puedo_disparar= true
+
+      end
+
     end
 
-    if !@game_over
-      @player_sprite.update
-      update_collisions
-
-    end
     update_enemies
     update_shoots
     @background.oy -= 5
@@ -165,7 +243,7 @@ class K_Invaders_Scene <Scene_Base
 
         @array_indices_disparos_enemigos.push(index_d)
         @jugador_disparado = true
-        @estoy_vivo = false
+        
       end
       }
 
@@ -174,7 +252,7 @@ class K_Invaders_Scene <Scene_Base
       if(enemigo.collision?(@player_sprite))
         @jugador_disparado =true;
         @array_indices_enemigos.push(index_e)
-        @estoy_vivo = false
+        
       end
 
     }
@@ -185,6 +263,9 @@ class K_Invaders_Scene <Scene_Base
       @array_enemigos[e].dispose
       @array_enemigos[e] = nil
       @impact.play
+      $puntaje += 1
+      @window_score.refresh
+
     }
     @array_indices_disparos.each { |e| 
 
@@ -201,8 +282,21 @@ class K_Invaders_Scene <Scene_Base
     if @jugador_disparado
     
       @player_sprite.dispose
-      @game_over=true
       @impact.play
+      $vidas-=1
+      @window_score.refresh
+
+      @estoy_vivo = false
+
+      if $vidas==0
+      
+        @game_over=true
+
+        game_over_text="Game Over"
+        cx = text_size(game_over_text).width
+        draw_text(x, y,cx,line_height, game_over_text, 0)
+      end
+     
     end
 
     @array_enemigos.compact!
@@ -210,6 +304,8 @@ class K_Invaders_Scene <Scene_Base
     @array_disparos_enemigos.compact!
 
   end
+
+
   #--------------------------------------------------------------------------
   # * Update Frame (Basic)
   #--------------------------------------------------------------------------
@@ -259,7 +355,7 @@ class Sprite_Player < Sprite
    
   def setup_player_image
     @sprite_rect = 1
-    @velocidad_jugador =5
+    @velocidad_jugador = Inv_Settings::VELOCIDAD_JUGADOR
     self.bitmap = Cache.cargar("player")
     self.src_rect= Rect.new(@sprite_rect * ancho, 0, ancho, largo)
     self.x = Graphics.width / 2
@@ -448,14 +544,14 @@ class Sprite_Enemy < Sprite
 
   def update_position
     if @tipo_mov ==0
-      self.x +=2
-      self.y +=2
+      self.x +=Inv_Settings::VELOCIDAD_ENEMIGO
+      self.y +=Inv_Settings::VELOCIDAD_ENEMIGO
       @contador_mov +=1
     end
 
     if @tipo_mov ==1
-      self.x -=2
-      self.y +=2
+      self.x -=Inv_Settings::VELOCIDAD_ENEMIGO
+      self.y +=Inv_Settings::VELOCIDAD_ENEMIGO
       @contador_mov +=1
     end
 
@@ -533,9 +629,9 @@ class Sprite_Shooting < Sprite
   def update_position
 
     if @player
-      self.y -=8
+      self.y -=Inv_Settings::VELOCIDAD_DISPARO_JUGADOR
     else 
-      self.y +=4
+      self.y +=Inv_Settings::VELOCIDAD_DISPARO_ENEMIGO
     end
   end
 
@@ -637,36 +733,25 @@ class Window_Score < Window_Base
     refresh
   end
    
-  def refresh(shields = Galv_SI::PLAYER_SHIELDS.to_f,bonus_shields = 0)
+  def refresh()
     contents.clear
-    draw_score("Score: ", score, 4, 0, contents.width - 8, 2)
-    draw_score("Best: ", high_score, -(Graphics.width / 2) + 70, 0, contents.width - 8, 2)
-    draw_shields(shields, 4, 0)
-    draw_bonus_shields(bonus_shields)
-  end
-   
-  def draw_shields(shields, x, y, width = Graphics.width / 4)
-    draw_gauge(x, y, width, shields / Galv_SI::PLAYER_SHIELDS.to_f, text_color(1),
-    text_color(4))
-  end
-   
-  def draw_bonus_shields(x,width = Graphics.width / 4)
-    w = width * x / Galv_SI::PLAYER_SHIELDS.to_f
-    rect = Rect.new(4, 0, w, 12)
-    contents.fill_rect(rect, text_color(1))
+    dibujar_texto("Puntos: ", score, 0, 0, 0)
+    dibujar_texto("Vidas: ", vidas, Graphics.width - 120, 0, 0)
+    
   end
    
   def score
-    $game_variables[Galv_SI::SCORE_VAR]
+    $puntaje
   end
-  def high_score
-    $game_variables[Galv_SI::HIGH_SCORE_VAR]
+  def vidas
+    $vidas
   end
  
-  def draw_score(value, unit, x, y, width, align)
-    cx = text_size(unit).width
-    draw_text(x, y, width - cx - 2, line_height, value, align)
-    draw_text(x, y, width, line_height, unit, align)
+  def dibujar_texto(texto, num, x, y, align)
+    cx = text_size(texto).width
+    draw_text(x, y,cx,line_height, texto, align)
+    draw_text(x + cx, y,cx,line_height, num, align)
+    
   end
    
   def open
